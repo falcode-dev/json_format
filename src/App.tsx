@@ -2,21 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import './App.css'
 
-type TeamRecord = {
-  teamid: string
-  name: string
-  bu?: string
-  email?: string
-  description?: string
-  [key: string]: unknown
+type RoleAssociation = {
+  roleid?: string
+  name?: string
 }
 
-type RoleRecord = {
-  roleid: string
-  name: string
-  teamid: string
-  privilege?: string
-  environment?: string
+type TeamRecord = {
+  teamid?: string
+  name?: string
+  _businessunitid_value?: string
+  com_team_category?: number
+  teamroles_association?: RoleAssociation[]
   [key: string]: unknown
 }
 
@@ -28,176 +24,92 @@ type TabularRow = {
   teamName: string
   teamId: string
   bu: string
-  email: string
+  category: string
+  roleId: string
   roleName: string
-  privilege: string
-  environment: string
 }
 
 const mockTeamsResponse: TeamsResponse = {
   value: [
     {
-      teamid: '5d0a8577-4d4a-4db9-8a41-10a10d998a6a',
+      teamid: 'd4d7cd62-e35c-4807-83c1-8651724af010',
       name: 'APAC Sales Squad',
-      bu: 'Sales',
-      email: 'apac-sales@dataverse.demo',
-      description: 'APAC向け商談と案件引継ぎを担当',
+      _businessunitid_value: 'BU-SALES',
+      com_team_category: 1001,
+      teamroles_association: [
+        { roleid: 'role-001', name: 'Sales Manager' },
+        { roleid: 'role-099', name: 'Quote Approver' },
+      ],
     },
     {
-      teamid: '70608fd8-7226-4b5f-82c9-f252fbb5b2c4',
+      teamid: '3afbfda6-7409-4412-a89f-5dca3a940079',
       name: 'Customer Care Core',
-      bu: 'Service',
-      email: 'care-core@dataverse.demo',
-      description: '一次受電とCS調査を担当するサポートチーム',
+      _businessunitid_value: 'BU-SERVICE',
+      com_team_category: 2003,
+      teamroles_association: [{ roleid: 'role-201', name: 'Case Agent' }],
     },
     {
-      teamid: 'b1c8f265-12d0-42a3-8a48-1d679bc08159',
+      teamid: '7f74218f-0fd4-4f64-9750-0c2709fcc7af',
       name: 'DataOps Guild',
-      bu: 'Operations',
-      email: 'dataops@dataverse.demo',
-      description: 'Dataverse連携とCleansingを担う分析チーム',
+      _businessunitid_value: 'BU-OPS',
+      com_team_category: 3100,
+      teamroles_association: [
+        { roleid: 'role-310', name: 'System Customizer' },
+        { roleid: 'role-311', name: 'Environment Maker' },
+      ],
     },
   ],
 }
 
-const mockRoleResponses: Record<string, RoleRecord[]> = {
-  '5d0a8577-4d4a-4db9-8a41-10a10d998a6a': [
-    {
-      roleid: '0bb9e9d8-6051-4a34-96d4-0605c7221599',
-      name: 'Sales Manager',
-      teamid: '5d0a8577-4d4a-4db9-8a41-10a10d998a6a',
-      privilege: 'Read/Write + Share',
-      environment: 'PROD',
-    },
-    {
-      roleid: 'df93d5c7-bccb-4638-b6f4-d2a7c4ede94d',
-      name: 'Quote Approver',
-      teamid: '5d0a8577-4d4a-4db9-8a41-10a10d998a6a',
-      privilege: 'Approve Quotes',
-      environment: 'PROD',
-    },
-  ],
-  '70608fd8-7226-4b5f-82c9-f252fbb5b2c4': [
-    {
-      roleid: 'b3f1a1e9-3588-4b73-864c-e0c668d75fa0',
-      name: 'Case Agent',
-      teamid: '70608fd8-7226-4b5f-82c9-f252fbb5b2c4',
-      privilege: 'Create/Update Cases',
-      environment: 'PROD',
-    },
-  ],
-  'b1c8f265-12d0-42a3-8a48-1d679bc08159': [
-    {
-      roleid: '3f6c64fc-7189-47d7-8f04-6bd9dfe8cc1a',
-      name: 'System Customizer',
-      teamid: 'b1c8f265-12d0-42a3-8a48-1d679bc08159',
-      privilege: 'Solution Export',
-      environment: 'SANDBOX',
-    },
-    {
-      roleid: '5e3b0623-5436-4fd4-8efa-0ff2f634eb07',
-      name: 'Environment Maker',
-      teamid: 'b1c8f265-12d0-42a3-8a48-1d679bc08159',
-      privilege: 'Maker + PowerFX',
-      environment: 'SANDBOX',
-    },
-  ],
-}
-
-const defaultTeamsEndpoint =
-  'https://your-org.crm.dynamics.com/api/data/v9.2/teams?$select=teamid,name,businessunitid'
-const defaultRolesEndpointTemplate =
-  'https://your-org.crm.dynamics.com/api/data/v9.2/teams/{teamId}/teammembership_association?$select=roleid,name'
-
-const buildHeaders = (token?: string): HeadersInit => {
-  const headers: HeadersInit = {
-    Accept: 'application/json',
-    'OData-Version': '4.0',
-  }
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-  return headers
-}
-
-const resolveRoleUrl = (template: string, teamId: string) => {
-  if (template.includes('{{teamId}}')) {
-    return template.replaceAll('{{teamId}}', teamId)
-  }
-  if (template.includes('{teamId}')) {
-    return template.replaceAll('{teamId}', teamId)
-  }
-  const connector = template.includes('?') ? '&' : '?'
-  return `${template}${connector}teamid=${encodeURIComponent(teamId)}`
-}
+const formatCategory = (value?: number) =>
+  typeof value === 'number' ? String(value) : ''
 
 function App() {
-  const [teamsEndpoint, setTeamsEndpoint] = useState(defaultTeamsEndpoint)
-  const [rolesEndpointTemplate, setRolesEndpointTemplate] = useState(
-    defaultRolesEndpointTemplate,
-  )
-  const [token, setToken] = useState('')
   const [teams, setTeams] = useState<TeamRecord[]>([])
-  const [rolesByTeam, setRolesByTeam] = useState<Record<string, RoleRecord[]>>(
-    {},
-  )
-  const [teamsLoading, setTeamsLoading] = useState(false)
-  const [rolesLoading, setRolesLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [lastTeamsSource, setLastTeamsSource] = useState<
-    'mock' | 'api' | 'json' | null
-  >(null)
-  const [lastRolesSource, setLastRolesSource] = useState<'mock' | 'api' | null>(
-    null,
-  )
+  const [lastSource, setLastSource] = useState<'mock' | 'json' | null>(null)
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const combinedRows = useMemo(
-    () =>
-      teams.map((team) => ({
-        team,
-        roles: rolesByTeam[team.teamid] ?? [],
-      })),
-    [teams, rolesByTeam],
-  )
-
   const tabularRows = useMemo<TabularRow[]>(() => {
-    if (combinedRows.length === 0) {
+    if (teams.length === 0) {
       return []
     }
-    return combinedRows.flatMap(({ team, roles }) => {
+    return teams.flatMap((team) => {
+      const roles = team.teamroles_association ?? []
       if (roles.length === 0) {
         return [
           {
             teamName: team.name ?? '',
             teamId: team.teamid ?? '',
-            bu: team.bu ?? '',
-            email: team.email ?? '',
+            bu: team._businessunitid_value ?? '',
+            category: formatCategory(team.com_team_category),
+            roleId: '',
             roleName: '',
-            privilege: '',
-            environment: '',
           },
         ]
       }
       return roles.map((role) => ({
         teamName: team.name ?? '',
         teamId: team.teamid ?? '',
-        bu: team.bu ?? '',
-        email: team.email ?? '',
+        bu: team._businessunitid_value ?? '',
+        category: formatCategory(team.com_team_category),
+        roleId: role.roleid ?? '',
         roleName: role.name ?? '',
-        privilege: role.privilege ?? '',
-        environment: role.environment ?? '',
       }))
     })
-  }, [combinedRows])
+  }, [teams])
 
   const loadMockData = () => {
     setError(null)
     setTeams(mockTeamsResponse.value)
-    setRolesByTeam(mockRoleResponses)
-    setLastTeamsSource('mock')
-    setLastRolesSource('mock')
+    setLastSource('mock')
+  }
+
+  const clearData = () => {
+    setTeams([])
+    setLastSource(null)
+    setError(null)
   }
 
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -210,9 +122,7 @@ function App() {
       const parsed = JSON.parse(text) as TeamsResponse
       const list = parsed.value ?? []
       setTeams(list)
-      setRolesByTeam({})
-      setLastTeamsSource('json')
-      setLastRolesSource(null)
+      setLastSource('json')
       setError(null)
     } catch (err) {
       setError(
@@ -235,10 +145,9 @@ function App() {
       'Team Name',
       'Team ID',
       'Business Unit',
-      'Email',
+      'Category',
+      'Role ID',
       'Role Name',
-      'Privilege',
-      'Environment',
     ]
       .join('\t')
       .trim()
@@ -248,10 +157,9 @@ function App() {
         row.teamName,
         row.teamId,
         row.bu,
-        row.email,
+        row.category,
+        row.roleId,
         row.roleName,
-        row.privilege,
-        row.environment,
       ]
         .map((value) => sanitize(value ?? ''))
         .join('\t'),
@@ -276,65 +184,6 @@ function App() {
     }
   }
 
-  const fetchTeams = async () => {
-    setTeamsLoading(true)
-    setError(null)
-    setLastTeamsSource(null)
-    try {
-      const teamsResponse = await fetch(teamsEndpoint, {
-        headers: buildHeaders(token),
-      })
-      if (!teamsResponse.ok) {
-        throw new Error(
-          `Teams APIエラー: ${teamsResponse.status} ${teamsResponse.statusText}`,
-        )
-      }
-      const teamsJson = (await teamsResponse.json()) as TeamsResponse
-      const teamList = teamsJson.value ?? []
-      setTeams(teamList)
-      setRolesByTeam({})
-      setLastTeamsSource('api')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setTeamsLoading(false)
-    }
-  }
-
-  const fetchRoles = async () => {
-    if (teams.length === 0) {
-      setError('先にTeams APIを実行してチーム一覧を取得してください。')
-      return
-    }
-    setRolesLoading(true)
-    setError(null)
-    setLastRolesSource(null)
-    try {
-      const roleMap: Record<string, RoleRecord[]> = {}
-      for (const team of teams) {
-        const roleUrl = resolveRoleUrl(rolesEndpointTemplate, team.teamid)
-        const roleResponse = await fetch(roleUrl, {
-          headers: buildHeaders(token),
-        })
-        if (!roleResponse.ok) {
-          roleMap[team.teamid] = []
-          continue
-        }
-        const roleJson = (await roleResponse.json()) as {
-          value?: RoleRecord[]
-          role?: RoleRecord[]
-        }
-        roleMap[team.teamid] = roleJson.value ?? roleJson.role ?? []
-      }
-      setRolesByTeam(roleMap)
-      setLastRolesSource('api')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setRolesLoading(false)
-    }
-  }
-
   useEffect(() => {
     return () => {
       if (copyTimerRef.current) {
@@ -348,84 +197,47 @@ function App() {
       <div>
         <h1>Dataverse Teams & Roles</h1>
         <p className="lead">
-          Teams APIで取得した一覧を保持し、teamidを使ってRoles APIを繰り返し実行。
-          シンプルな表形式でExcelへコピーできます。
+          DataverseからエクスポートしたJSON（<code>{'{"value":[]}'}</code>形式）を読み込み、
+          チームと紐づくロールをExcel向けの表で確認できます。
         </p>
       </div>
 
       <section className="card">
-        <h2>1. API設定と実行</h2>
+        <h2>1. JSONを読み込む</h2>
         <p className="caption">
-          <code>{'{teamId}'}</code> または <code>{'{{teamId}}'}</code> をURLに含めるとチームIDが差し込まれます。
+          各チームに
+          <code>_businessunitid_value</code>,{' '}
+          <code>com_team_category</code>,{' '}
+          <code>teamroles_association</code> を含めてください。
         </p>
-        <div className="controls-grid">
-          <label>
-            Teams API URL
-            <input
-              type="text"
-              value={teamsEndpoint}
-              onChange={(event) => setTeamsEndpoint(event.target.value)}
-              placeholder="https://org.crm.dynamics.com/api/data/v9.2/teams?... "
-            />
-          </label>
-          <label>
-            Roles API URLテンプレート
-            <input
-              type="text"
-              value={rolesEndpointTemplate}
-              onChange={(event) => setRolesEndpointTemplate(event.target.value)}
-              placeholder="https://org.crm.dynamics.com/api/.../{teamId}"
-            />
-          </label>
-          <label>
-            Bearer Token (任意)
-            <input
-              type="password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              placeholder="Dataverse OAuthトークン"
-            />
-          </label>
-          <label>
-            JSONファイル読込
+        <div className="upload-area">
+          <label className="file-input">
+            <span>JSONファイル</span>
             <input type="file" accept="application/json" onChange={handleUpload} />
           </label>
-        </div>
-        <div className="actions">
-          <button type="button" className="outline" onClick={loadMockData}>
-            モックデータを読み込む
-          </button>
-          <button
-            type="button"
-            className="primary"
-            onClick={fetchTeams}
-            disabled={teamsLoading}
-          >
-            {teamsLoading ? 'Teams取得中...' : 'Teams APIを実行'}
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            onClick={fetchRoles}
-            disabled={rolesLoading || teams.length === 0}
-          >
-            {rolesLoading ? 'Roles取得中...' : 'Roles APIを実行'}
-          </button>
+          <div className="upload-actions">
+            <button type="button" className="primary" onClick={loadMockData}>
+              サンプルJSONを読み込む
+            </button>
+            <button
+              type="button"
+              className="outline"
+              onClick={clearData}
+              disabled={teams.length === 0}
+            >
+              クリア
+            </button>
+          </div>
         </div>
         {error && <p className="error">⚠️ {error}</p>}
-        <div className="status-stack">
-          {lastTeamsSource && (
-            <p className="status">
-              Teams: {lastTeamsSource === 'mock' ? 'モックデータ' : 'API呼び出し'}
-              ／{teams.length}件
-            </p>
-          )}
-          {lastRolesSource && (
-            <p className="status">
-              Roles: {lastRolesSource === 'mock' ? 'モックデータ' : 'API呼び出し'}
-            </p>
-          )}
-        </div>
+        {lastSource && (
+          <p className="status">
+            {lastSource === 'mock'
+              ? 'サンプルデータを表示中'
+              : 'JSONファイルを表示中'}
+            ／{teams.length}件
+          </p>
+        )}
       </section>
 
       <section className="card">
@@ -436,7 +248,7 @@ function App() {
               <span className="badge">Teams: {teams.length}</span>
             </div>
             <p className="caption">
-              列幅を固定せず、シンプルなタブ区切り形式でコピーできます。
+              チームとロールの組み合わせをタブ区切りでコピーできます。
             </p>
           </div>
           <button
@@ -456,17 +268,16 @@ function App() {
                 <th>Team Name</th>
                 <th>Team ID</th>
                 <th>Business Unit</th>
-                <th>Email</th>
+                <th>Category</th>
+                <th>Role ID</th>
                 <th>Role Name</th>
-                <th>Privilege</th>
-                <th>Environment</th>
               </tr>
             </thead>
             <tbody>
               {tabularRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="empty-row">
-                    まだデータがありません。モックデータを読み込むかAPIを実行してください。
+                  <td colSpan={6} className="empty-row">
+                    まだデータがありません。JSONファイルを読み込むかサンプルを使用してください。
                   </td>
                 </tr>
               ) : (
@@ -475,10 +286,9 @@ function App() {
                     <td>{row.teamName || '-'}</td>
                     <td>{row.teamId || '-'}</td>
                     <td>{row.bu || '-'}</td>
-                    <td>{row.email || '-'}</td>
+                    <td>{row.category || '-'}</td>
+                    <td>{row.roleId || '-'}</td>
                     <td>{row.roleName || '-'}</td>
-                    <td>{row.privilege || '-'}</td>
-                    <td>{row.environment || '-'}</td>
                   </tr>
                 ))
               )}
@@ -489,7 +299,7 @@ function App() {
 
       <section className="card">
         <div className="table-header">
-          <h2>3. Teams JSONプレビュー</h2>
+          <h2>3. JSONプレビュー</h2>
           <span className="badge">{teams.length} 件</span>
         </div>
         <pre className="json-block">
