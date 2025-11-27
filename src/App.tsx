@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import './App.css'
 
 type TeamRecord = {
@@ -143,9 +144,9 @@ function App() {
   const [teamsLoading, setTeamsLoading] = useState(false)
   const [rolesLoading, setRolesLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [lastTeamsSource, setLastTeamsSource] = useState<'mock' | 'api' | null>(
-    null,
-  )
+  const [lastTeamsSource, setLastTeamsSource] = useState<
+    'mock' | 'api' | 'json' | null
+  >(null)
   const [lastRolesSource, setLastRolesSource] = useState<'mock' | 'api' | null>(
     null,
   )
@@ -197,6 +198,31 @@ function App() {
     setRolesByTeam(mockRoleResponses)
     setLastTeamsSource('mock')
     setLastRolesSource('mock')
+  }
+
+  const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text) as TeamsResponse
+      const list = parsed.value ?? []
+      setTeams(list)
+      setRolesByTeam({})
+      setLastTeamsSource('json')
+      setLastRolesSource(null)
+      setError(null)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `JSONファイルの読み込みに失敗しました: ${err.message}`
+          : 'JSONファイルの読み込みに失敗しました。',
+      )
+    } finally {
+      event.target.value = ''
+    }
   }
 
   const handleCopyTable = async () => {
@@ -359,6 +385,10 @@ function App() {
               onChange={(event) => setToken(event.target.value)}
               placeholder="Dataverse OAuthトークン"
             />
+          </label>
+          <label>
+            JSONファイル読込
+            <input type="file" accept="application/json" onChange={handleUpload} />
           </label>
         </div>
         <div className="actions">
