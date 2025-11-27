@@ -282,7 +282,7 @@ function App() {
                 </tr>
               ) : (
                 tabularRows.map((row, index) => (
-                  <tr key={`${row.teamId}-${row.roleName}-${index}`}>
+                  <tr key={`${row.teamId ?? row.teamName}-${row.roleName}-${index}`}>
                     <td>{row.teamName || '-'}</td>
                     <td>{row.teamId || '-'}</td>
                     <td>{row.bu || '-'}</td>
